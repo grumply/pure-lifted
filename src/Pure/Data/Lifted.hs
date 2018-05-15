@@ -1,9 +1,6 @@
 {-# LANGUAGE CPP, OverloadedStrings, ForeignFunctionInterface, JavaScriptFFI, BangPatterns, ViewPatterns, FlexibleContexts #-}
 module Pure.Data.Lifted where
 
--- | This module exports functions for interacting with the DOM that are
--- conditionally compiled to no-ops on GHC.
-
 -- from base
 import Control.Monad (when,join)
 import Data.Coerce (Coercible())
