@@ -13,16 +13,20 @@ cabal-version:       >=1.10
 library
   build-depends:
     base >= 4.8 && < 5,
-    pure-core >= 0.7 && < 1,
+    pure-default >= 0.7 && < 1,
     pure-txt >= 0.7 && < 1
 
   hs-source-dirs: src
 
   exposed-modules:
+    Pure.Animation
+    Pure.IdleWork
     Pure.Data.Lifted
 
   if (impl(ghcjs))
     build-depends:
       ghcjs-base >= 0.2 && < 0.3
+
+    js-sources: js/ric-shim.js
 
   default-language: Haskell2010
