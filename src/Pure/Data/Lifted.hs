@@ -48,14 +48,17 @@ newtype Frag    = Frag JSV
 newtype History = History JSV
 newtype Loc     = Loc JSV
 
+{-# INLINE toJSV #-}
 toJSV :: Coercible a JSV => a -> JSV
 toJSV = coerce
 
 class IsNode e where
   toNode :: e -> Node
   default toNode :: Coercible e Node => e -> Node
+  {-# INLINE toNode #-}
   toNode = coerce
 instance IsNode Node where
+  {-# INLINE toNode #-}
   toNode = id
 instance IsNode Body
 instance IsNode Head
@@ -242,12 +245,15 @@ foreign import javascript unsafe
 foreign import javascript unsafe
   "$1.stopPropagation" prev_prop_js :: JSV -> IO ()
 
+{-# INLINE prevDef #-}
 prevDef :: Evt -> IO ()
 prevDef ev = prev_def_js (evtObj ev)
 
+{-# INLINE prevProp #-}
 prevProp :: Evt -> IO ()
 prevProp ev = prev_prop_js (evtObj ev)
 
+{-# INLINE onRaw #-}
 onRaw :: Node -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
 onRaw n nm os f = do
   stopper <- newIORef undefined
@@ -261,46 +267,59 @@ onRaw n nm os f = do
   addEventListener n nm cb (passive os)
   return (join $ readIORef stopper)
 
+{-# INLINE (.#) #-}
 (.#) :: PFromJSVal a => JSV -> Txt -> Maybe a
 (.#) jsv t =
   let v = get_prop_unsafe_js_pure jsv t
   in if isNull v || isUndefined v then Nothing else Just (pFromJSVal v)
 
+{-# INLINE (..#) #-}
 (..#) :: FromJSVal a => JSV -> Txt -> IO (Maybe a)
 (..#) jsv t = do
   v <- get_prop_unsafe_js jsv t
   if isNull v || isUndefined v then return Nothing else fromJSVal v
 
+{-# INLINE create #-}
 create :: Txt -> IO Element
 create tag = create_element_js tag
 
+{-# INLINE createNS #-}
 createNS :: Txt -> Txt -> IO Element
 createNS ns tag = create_element_ns_js ns tag
 
+{-# INLINE createText #-}
 createText :: Txt -> IO Text
 createText txt = create_text_js txt
 
+{-# INLINE createFrag #-}
 createFrag :: IO Frag
 createFrag = create_frag_js
 
+{-# INLINE append #-}
 append :: (IsNode child) => Node -> child -> IO ()
 append parent (toNode -> child) = append_child_js parent child
 
+{-# INLINE insertBefore #-}
 insertBefore :: Element -> Node -> Node -> IO ()
 insertBefore parent new ref = insert_before_js parent new ref
 
+{-# INLINE insertAt #-}
 insertAt :: Element -> Node -> Int -> IO ()
 insertAt parent new idx = insert_at_js parent new idx
 
+{-# INLINE setInnerHTML #-}
 setInnerHTML :: Element -> Txt -> IO ()
 setInnerHTML e t = set_inner_html_js e t
 
+{-# INLINE replaceNode #-}
 replaceNode :: Node -> Node -> IO ()
 replaceNode n1 n2 = replace_node_js n1 n2
 
+{-# INLINE replaceText #-}
 replaceText :: Text -> Txt -> IO ()
 replaceText n t = replace_text_js n t
 
+{-# INLINE findByTag #-}
 findByTag :: Txt -> IO (Maybe Element)
 findByTag tag = do
   e <- get_first_element_by_tag_name_js tag
@@ -308,6 +327,7 @@ findByTag tag = do
     then return Nothing
     else return (Just e)
 
+{-# INLINE findById #-}
 findById :: Txt -> IO (Maybe Element)
 findById i = do
   e <- get_element_by_id_js i
@@ -315,15 +335,19 @@ findById i = do
     then return Nothing
     else return (Just e)
 
+{-# INLINE removeNode #-}
 removeNode :: IsNode n => n -> IO ()
 removeNode (toNode -> n) = remove_js n
 
+{-# INLINE same #-}
 same :: (Coercible j1 JSV, Coercible j2 JSV) => j1 -> j2 -> Bool
 same (toJSV -> j1) (toJSV -> j2) = reference_equality_js j1 j2
 
+{-# INLINE isNull #-}
 isNull :: (Coercible j JSV) => j -> Bool
 isNull (toJSV -> j) = is_null_js j
 
+{-# INLINE getChild #-}
 getChild :: IsNode n => n -> Int -> IO (Maybe Node)
 getChild (toNode -> n) i = do
   mn <- get_child_js n i
@@ -331,96 +355,127 @@ getChild (toNode -> n) i = do
     then return Nothing
     else return (Just mn)
 
+{-# INLINE textContent #-}
 textContent :: IsNode n => n -> IO Txt
 textContent (toNode -> n) = text_content_js n
 
+{-# INLINE setAttribute #-}
 setAttribute :: Element -> Txt -> Txt -> IO ()
 setAttribute e k v = set_attribute_js e k v
 
+{-# INLINE setProperty #-}
 setProperty :: Element -> Txt -> Txt -> IO ()
 setProperty e k v = set_property_js e k v
 
+{-# INLINE setStyle #-}
 setStyle :: Element -> Txt -> Txt -> IO ()
 setStyle e k v = set_style_js e k v
 
+{-# INLINE removeAttribute #-}
 removeAttribute :: Element -> Txt -> IO ()
 removeAttribute e k = remove_attribute_js e k
 
+{-# INLINE removeAttributeNS #-}
 removeAttributeNS :: Element -> Txt -> Txt -> IO ()
 removeAttributeNS e k v = remove_attribute_ns_js e k v
 
+{-# INLINE removeProperty #-}
 removeProperty :: Element -> Txt -> IO ()
 removeProperty e p = remove_property_js e p
 
+{-# INLINE removeStyle #-}
 removeStyle :: Element -> Txt -> IO ()
 removeStyle e s = remove_style_js e s
 
+{-# INLINE preventDefault #-}
 preventDefault :: JSV -> IO ()
 preventDefault e = prevent_default_js e
 
+{-# INLINE stopPropagation #-}
 stopPropagation :: JSV -> IO ()
 stopPropagation e = stop_propagation_js e
 
+{-# INLINE addEventListener #-}
 addEventListener :: Coercible target JSV => target -> Txt -> Callback (JSV -> IO ()) -> Bool -> IO ()
 addEventListener (toJSV -> target) e cb p = add_event_listener_js target e cb p
 
+{-# INLINE cancelAnimationFrame #-}
 cancelAnimationFrame :: Int64 -> IO ()
 cancelAnimationFrame af = cancel_animation_frame_js af
 
+{-# INLINE cancelIdleCallback #-}
 cancelIdleCallback :: Int64 -> IO ()
 cancelIdleCallback cb = cancel_idle_callback_js cb
 
+{-# INLINE removeEventListener #-}
 removeEventListener :: Coercible target JSV => target -> Txt -> Callback (JSV -> IO ()) -> IO ()
 removeEventListener (toJSV -> target) e cb = remove_event_listener_js target e cb
 
+{-# INLINE requestAnimationFrame #-}
 requestAnimationFrame :: Callback (JSV -> IO ()) -> IO Int64
 requestAnimationFrame cb = request_animation_frame_js cb
 
+{-# INLINE requestIdleCallback #-}
 requestIdleCallback :: Callback (JSV -> IO ()) -> IO Int64
 requestIdleCallback cb = request_idle_callback_js cb
 
+{-# INLINE getWindow #-}
 getWindow :: IO Win
 getWindow = return window
 
+{-# INLINE getBody #-}
 getBody :: IO Body
 getBody = return body
 
+{-# INLINE getDocument #-}
 getDocument :: IO Doc
 getDocument = return document
 
+{-# INLINE getHead #-}
 getHead :: IO Head
 getHead = return head
 
+{-# INLINE getHistory #-}
 getHistory :: IO History
 getHistory = return history
 
+{-# INLINE pushState #-}
 pushState :: Txt -> IO ()
 pushState h = push_state_js h
 
+{-# INLINE setAttributeNS #-}
 setAttributeNS :: Element -> Txt -> Txt -> Txt -> IO ()
 setAttributeNS e ns k v = set_attribute_ns_js e ns k v
 
+{-# INLINE popState #-}
 popState :: IO ()
 popState = pop_state_js
 
+{-# INLINE scrollToTop #-}
 scrollToTop :: IO ()
 scrollToTop = scroll_to_top_js
 
+{-# INLINE clickNode #-}
 clickNode :: Node -> IO ()
 clickNode n = click_js n
 
+{-# INLINE blurNode #-}
 blurNode :: Node -> IO ()
 blurNode n = blur_js n
 
+{-# INLINE focusNode #-}
 focusNode :: Node -> IO ()
 focusNode n = focus_js n
 
+{-# INLINE clear #-}
 clear :: Node -> IO ()
 clear n = clear_js n
 
+{-# INLINE getPathname #-}
 getPathname :: IO Txt
 getPathname = pathname_js
 
+{-# INLINE getSearch #-}
 getSearch :: IO Txt
 getSearch = search_js
 #else

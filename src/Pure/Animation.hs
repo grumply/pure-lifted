@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 module Pure.Animation (addAnimation) where
 
-import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar,yield)
+import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar)
 import Control.Monad (void)
 import Data.IORef (IORef,newIORef,atomicModifyIORef')
 import System.IO.Unsafe (unsafePerformIO)
@@ -38,7 +38,6 @@ animator = unsafePerformIO $ void $ forkIO await
   where
     await :: IO ()
     await = do
-        yield
         takeMVar animationsAwaiting
         as <- atomicModifyIORef' animationQueue $ \as -> ([],as)
         animate as
