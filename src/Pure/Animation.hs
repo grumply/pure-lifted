@@ -2,7 +2,7 @@
 module Pure.Animation (addAnimation) where
 
 import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar)
-import Control.Monad (void)
+import Control.Monad (void,forever)
 import Data.IORef (IORef,newIORef,atomicModifyIORef')
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -37,40 +37,31 @@ animator :: ()
 animator = unsafePerformIO $ void $ forkIO await
   where
     await :: IO ()
-    await = do
+    await = forever $ do
         takeMVar animationsAwaiting
         as <- atomicModifyIORef' animationQueue $ \as -> ([],as)
         animate as
 
-    {-# INLINE (<<) #-}
-    (<<) :: IO b -> IO a -> IO b
-    (<<) = flip (>>)
+{-# INLINE (<<) #-}
+(<<) :: IO b -> IO a -> IO b
+(<<) = flip (>>)
 
-    animate :: [IO ()] -> IO ()
-    animate [] = await
-    animate as = await << do
+animate :: [IO ()] -> IO ()
+animate as = do
 #ifdef __GHCJS__
-        barrier <- newEmptyMVar
-        callback <- syncCallback1 ContinueAsync $ \_ -> do
-          run as
-          putMVar barrier ()
-        requestAnimationFrame callback
-        takeMVar barrier
-        releaseCallback callback
+    barrier <- newEmptyMVar
+    callback <- syncCallback1 ContinueAsync $ \_ -> do
+      run as
+      putMVar barrier ()
+    requestAnimationFrame callback
+    takeMVar barrier
+    releaseCallback callback
 #else
-        run as
+    run as
 #endif
-      where
-        {-# INLINE run #-}
-        run as = do
-          -- TODO: figure out if bs is ever (/= [])
-          bs <- atomicModifyIORef' animationQueue $ \bs -> ([],bs)
-          sequencer as
-          sequencer bs
-          where
-            {-# INLINE sequencer #-}
-            sequencer :: [IO ()] -> IO ()
-            sequencer = foldr (<<) (return ())
+  where
+    {-# INLINE run #-}
+    run = foldr (<<) (return ())
 
 
 

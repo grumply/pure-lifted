@@ -1,8 +1,8 @@
 {-# LANGUAGE CPP #-}
 module Pure.IdleWork (addIdleWork) where
 
-import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar,yield)
-import Control.Monad (void)
+import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar)
+import Control.Monad (void,forever)
 import Data.IORef (IORef,newIORef,atomicModifyIORef')
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -33,41 +33,31 @@ idleWorker :: ()
 idleWorker = unsafePerformIO $ void $ forkIO await
   where
     await :: IO ()
-    await = do
-        yield
+    await = forever $ do
         takeMVar idleWorkAwaiting
         as <- atomicModifyIORef' idleWorkQueue $ \as -> ([],as)
         workIdly as
 
-    {-# INLINE (<<) #-}
-    (<<) :: IO b -> IO a -> IO b
-    (<<) = flip (>>)
+{-# INLINE (<<) #-}
+(<<) :: IO b -> IO a -> IO b
+(<<) = flip (>>)
 
-    workIdly :: [IO ()] -> IO ()
-    workIdly [] = await
-    workIdly as = await << do
+workIdly :: [IO ()] -> IO ()
+workIdly as = do
 #ifdef __GHCJS__
-        barrier <- newEmptyMVar
-        callback <- syncCallback1 ContinueAsync $ \_ -> do
-          run as
-          putMVar barrier ()
-        requestIdleCallback callback
-        takeMVar barrier
-        releaseCallback callback
+    barrier <- newEmptyMVar
+    callback <- syncCallback1 ContinueAsync $ \_ -> do
+      run as
+      putMVar barrier ()
+    requestIdleCallback callback
+    takeMVar barrier
+    releaseCallback callback
 #else
-        run as
+    run as
 #endif
-      where
-        {-# INLINE run #-}
-        run as = do
-          -- TODO: figure out if bs is ever (/= [])
-          bs <- atomicModifyIORef' idleWorkQueue $ \bs -> ([],bs)
-          sequencer as
-          sequencer bs
-          where
-            {-# INLINE sequencer #-}
-            sequencer :: [IO ()] -> IO ()
-            sequencer = foldr (<<) (return ())
+  where
+    {-# INLINE run #-}
+    run = foldr (<<) (return ())
 
 
 

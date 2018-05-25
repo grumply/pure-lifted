@@ -105,10 +105,16 @@ foreign import javascript unsafe
   "$1.appendChild($2)" append_child_js :: Node -> Node -> IO ()
 
 foreign import javascript unsafe
-  "$1.insertBefore($2,$3)" insert_before_js :: Element -> Node -> Node -> IO ()
+  "$2.parentNode.insertBefore($1,$2)" insert_before_js :: Node -> Node -> IO ()
 
 foreign import javascript unsafe
   "$1.insertBefore($2, $1.children[$3]);" insert_at_js :: Element -> Node -> Int -> IO ()
+
+foreign import javascript unsafe
+  "Array.prototype.indexOf.call($1.parentNode,$1);" node_index_js :: Node -> IO Int
+
+foreign import javascript unsafe
+  "$1.nextSibling" next_sibling_js :: Node -> IO Node
 
 foreign import javascript unsafe
   "$1.innerHTML = $2" set_inner_html_js :: Element -> Txt -> IO ()
@@ -124,7 +130,7 @@ foreign import javascript unsafe
   "$1.textContent=$2" replace_text_js :: Text -> Txt -> IO ()
 
 foreign import javascript unsafe
-  "$1.innerHTML = ''" clear_node_js :: Node -> IO ()
+  "$1.textContent = ''" clear_node_js :: Node -> IO ()
 
 foreign import javascript unsafe
   "$1[$2] = $3" set_property_js :: Element -> Txt -> Txt -> IO ()
@@ -164,6 +170,9 @@ foreign import javascript unsafe
 
 foreign import javascript unsafe
   "$1.parentNode.removeChild($1)" remove_js :: Node -> IO ()
+
+foreign import javascript unsafe
+  "if ($1.parentNode) { $1.parentNode.removeChild($1); };" remove_maybe_js :: Node -> IO ()
 
 -- The difference between childNodes and children:
 -- https://stackoverflow.com/questions/7935689/what-is-the-difference-between-children-and-childnodes-in-javascript
@@ -295,17 +304,29 @@ createText txt = create_text_js txt
 createFrag :: IO Frag
 createFrag = create_frag_js
 
+{-# INLINE clearNode #-}
+clearNode :: IsNode node => node -> IO ()
+clearNode = clear_node_js . toNode
+
 {-# INLINE append #-}
 append :: (IsNode child) => Node -> child -> IO ()
 append parent (toNode -> child) = append_child_js parent child
 
 {-# INLINE insertBefore #-}
-insertBefore :: Element -> Node -> Node -> IO ()
-insertBefore parent new ref = insert_before_js parent new ref
+insertBefore :: Node -> Node -> IO ()
+insertBefore new ref = insert_before_js new ref
 
 {-# INLINE insertAt #-}
 insertAt :: Element -> Node -> Int -> IO ()
 insertAt parent new idx = insert_at_js parent new idx
+
+{-# INLINE nodeIndex #-}
+nodeIndex :: IsNode node => node -> IO Int
+nodeIndex = node_index_js . toNode
+
+{-# INLINE nextSibling#-}
+nextSibling :: IsNode node => node -> IO Node
+nextSibling = next_sibling_js . toNode
 
 {-# INLINE setInnerHTML #-}
 setInnerHTML :: Element -> Txt -> IO ()
@@ -338,6 +359,10 @@ findById i = do
 {-# INLINE removeNode #-}
 removeNode :: IsNode n => n -> IO ()
 removeNode (toNode -> n) = remove_js n
+
+{-# INLINE removeNodeMaybe #-}
+removeNodeMaybe :: IsNode n => n -> IO ()
+removeNodeMaybe = remove_maybe_js . toNode
 
 {-# INLINE same #-}
 same :: (Coercible j1 JSV, Coercible j2 JSV) => j1 -> j2 -> Bool
@@ -517,17 +542,23 @@ createText _ = return (Text ())
 createFrag :: IO Frag
 createFrag = return (Frag ())
 
+clearNode :: (IsNode node) => node -> IO ()
+clearNode _ = return ()
+
 append :: (IsNode child) => Node -> child -> IO ()
 append _ _ = return ()
 
-insertBefore :: Element -> Node -> Node -> IO ()
-insertBefore _ _ _ = return ()
+insertBefore :: Node -> Node -> IO ()
+insertBefore _ _ = return ()
 
 insertAt :: Element -> Node -> Int -> IO ()
 insertAt _ _ _ = return ()
 
 setInnerHTML :: Element -> Txt -> IO ()
 setInnerHTML _ _ = return ()
+
+nodeIndex :: IsNode node => node -> IO Int
+nodeIndex _ = return 0
 
 replaceNode :: Node -> Node -> IO ()
 replaceNode _ _ = return ()
@@ -543,6 +574,9 @@ findById _ = return $ Just $ Element ()
 
 removeNode :: IsNode n => n -> IO ()
 removeNode _ = return ()
+
+removeNodeMaybe :: IsNode n => n -> IO ()
+removeNodeMaybe _ = return ()
 
 same :: (Coercible j1 JSV, Coercible j2 JSV) => j1 -> j2 -> Bool
 same _ _ = True
