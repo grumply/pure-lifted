@@ -66,6 +66,7 @@ instance IsNode Element
 instance IsNode Text
 instance IsNode Frag
 instance IsNode Doc
+instance IsNode Win
 
 data Evt = Evt
   { evtObj            :: JSV
