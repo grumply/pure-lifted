@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-module Pure.Animation (addAnimation) where
+module Pure.Animation (addAnimation,addAnimations,addAnimationsReverse) where
 
 import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar)
 import Control.Monad (void,forever)
@@ -22,6 +22,18 @@ import Pure.Data.Lifted (requestAnimationFrame)
 addAnimation :: IO () -> IO Bool
 addAnimation a = animator `seq` do
     atomicModifyIORef' animationQueue $ \as -> (a:as,())
+    tryPutMVar animationsAwaiting ()
+
+{-# NOINLINE addAnimations #-}
+addAnimations :: [IO ()] -> IO Bool
+addAnimations new = animator `seq` do
+    atomicModifyIORef' animationQueue $ \as -> (reverse new ++ as,())
+    tryPutMVar animationsAwaiting ()
+
+{-# NOINLINE addAnimationsReverse #-}
+addAnimationsReverse :: [IO ()] -> IO Bool
+addAnimationsReverse new = animator `seq` do
+    atomicModifyIORef' animationQueue $ \as -> (new ++ as,())
     tryPutMVar animationsAwaiting ()
 
 {-# NOINLINE animationsAwaiting #-}
