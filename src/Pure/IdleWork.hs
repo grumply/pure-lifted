@@ -84,20 +84,16 @@ workIdly :: [IO ()] -> IO ()
 #ifdef __GHCJS__
 workIdly as = do
     barrier <- newEmptyMVar
-    go barrier as
+    cb <- newIORef (return ())
+    go cb barrier as
     join (takeMVar barrier)
   where
-    go :: MVar (IO ()) -> [IO ()] -> IO ()
-    go barrier = go'
+    go cb barrier = go'
       where
-        go' :: [IO ()] -> IO ()
         go' as0 = do
-          cb <- newIORef undefined
           callback <- syncCallback1 ContinueAsync $ \deadline -> flip fix as0 $ \continue as0 ->
             case as0 of
-              [] -> do
-                callback <- readIORef cb
-                putMVar barrier (releaseCallback callback)
+              []  -> readIORef cb >>= putMVar barrier >> writeIORef cb (return ())
               [a] -> a >> continue []
               (a0:a1:as) -> do
                 !_  <- a0
@@ -105,12 +101,11 @@ workIdly as = do
                 if tr
                   then continue (a1:as)
                   else do
-                    let a = do
-                          callback <- readIORef cb
-                          releaseCallback callback
-                          a1
+                    rc <- readIORef cb
+                    writeIORef cb (return ())
+                    let a = rc >> a1
                     go' (a:as)
-          writeIORef cb callback
+          writeIORef cb (releaseCallback callback)
           void $ requestIdleCallback callback
 #else
 workIdly = go 0
