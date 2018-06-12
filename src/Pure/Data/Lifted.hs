@@ -25,6 +25,8 @@ import GHCJS.Foreign.Callback as Export (Callback,syncCallback1,OnBlocked(..),re
 import GHCJS.Marshal.Pure (PFromJSVal(..))
 import GHCJS.Marshal (FromJSVal(..))
 import GHCJS.Types hiding (isNull)
+import qualified JavaScript.Web.AnimationFrame as GHCJS
+import qualified GHCJS.Concurrent as GHCJS
 #endif
 
 -- from ghcjs-base
@@ -67,6 +69,13 @@ instance IsNode Text
 instance IsNode Frag
 instance IsNode Doc
 instance IsNode Win
+
+type RAFHandle =
+#ifdef __GHCJS__
+  GHCJS.AnimationFrameHandle
+#else
+  JSV
+#endif
 
 data Evt = Evt
   { evtObj            :: JSV
@@ -202,9 +211,6 @@ foreign import javascript unsafe
   "$1.removeEventListener($2,$3)" remove_event_listener_js :: JSV -> Txt -> Callback (JSV -> IO ()) -> IO ()
 
 foreign import javascript unsafe
-  "$r = window.requestAnimationFrame($1)" request_animation_frame_js :: Callback (JSV -> IO ()) -> IO Int64
-
-foreign import javascript unsafe
   "$r = window.requestIdleCallback($1)" request_idle_callback_js :: Callback (JSV -> IO ()) -> IO Int64
 
 foreign import javascript unsafe
@@ -291,15 +297,15 @@ onRaw n nm os f = do
 
 {-# INLINE create #-}
 create :: Txt -> IO Element
-create tag = create_element_js tag
+create = create_element_js
 
 {-# INLINE createNS #-}
 createNS :: Txt -> Txt -> IO Element
-createNS ns tag = create_element_ns_js ns tag
+createNS = create_element_ns_js
 
 {-# INLINE createText #-}
 createText :: Txt -> IO Text
-createText txt = create_text_js txt
+createText = create_text_js
 
 {-# INLINE createFrag #-}
 createFrag :: IO Frag
@@ -310,16 +316,16 @@ clearNode :: IsNode node => node -> IO ()
 clearNode = clear_node_js . toNode
 
 {-# INLINE append #-}
-append :: (IsNode child) => Node -> child -> IO ()
-append parent (toNode -> child) = append_child_js parent child
+append :: IsNode node => Node -> node -> IO ()
+append parent child = append_child_js parent (toNode child)
 
 {-# INLINE insertBefore #-}
 insertBefore :: Node -> Node -> IO ()
-insertBefore new ref = insert_before_js new ref
+insertBefore = insert_before_js
 
 {-# INLINE insertAt #-}
 insertAt :: Element -> Node -> Int -> IO ()
-insertAt parent new idx = insert_at_js parent new idx
+insertAt = insert_at_js
 
 {-# INLINE nodeIndex #-}
 nodeIndex :: IsNode node => node -> IO Int
@@ -426,8 +432,8 @@ addEventListener :: Coercible target JSV => target -> Txt -> Callback (JSV -> IO
 addEventListener (toJSV -> target) e cb p = add_event_listener_js target e cb p
 
 {-# INLINE cancelAnimationFrame #-}
-cancelAnimationFrame :: Int64 -> IO ()
-cancelAnimationFrame af = cancel_animation_frame_js af
+cancelAnimationFrame :: RAFHandle -> IO ()
+cancelAnimationFrame = cancelAnimationFrame
 
 {-# INLINE cancelIdleCallback #-}
 cancelIdleCallback :: Int64 -> IO ()
@@ -438,8 +444,8 @@ removeEventListener :: Coercible target JSV => target -> Txt -> Callback (JSV ->
 removeEventListener (toJSV -> target) e cb = remove_event_listener_js target e cb
 
 {-# INLINE requestAnimationFrame #-}
-requestAnimationFrame :: Callback (JSV -> IO ()) -> IO Int64
-requestAnimationFrame cb = request_animation_frame_js cb
+requestAnimationFrame :: (Double -> IO ()) -> IO RAFHandle
+requestAnimationFrame f = GHCJS.inAnimationFrame ContinueAsync (GHCJS.withoutPreemption . f)
 
 {-# INLINE requestIdleCallback #-}
 requestIdleCallback :: Callback (JSV -> IO ()) -> IO Int64
@@ -546,7 +552,7 @@ createFrag = return (Frag ())
 clearNode :: (IsNode node) => node -> IO ()
 clearNode _ = return ()
 
-append :: (IsNode child) => Node -> child -> IO ()
+append :: IsNode node => Node -> node -> IO ()
 append _ _ = return ()
 
 insertBefore :: Node -> Node -> IO ()
@@ -621,13 +627,13 @@ addEventListener _ _ _ _ = return ()
 removeEventListener :: Coercible target  JSV=> target -> Txt -> (JSV -> IO ()) -> IO ()
 removeEventListener _ _ _ = return ()
 
-requestAnimationFrame :: (JSV -> IO ()) -> IO Int64
-requestAnimationFrame _ = return 0
+requestAnimationFrame :: (Double -> IO ()) -> IO RAFHandle
+requestAnimationFrame f = f 0
 
 requestIdleCallback :: (JSV -> IO ()) -> IO Int64
-requestIdleCallback _ = return 0
+requestIdleCallback f = f () >> return 0
 
-cancelAnimationFrame :: Int64 -> IO ()
+cancelAnimationFrame :: RAFHandle -> IO ()
 cancelAnimationFrame _ = return ()
 
 cancelIdleCallback :: Int64 -> IO ()
