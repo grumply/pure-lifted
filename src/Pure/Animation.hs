@@ -62,12 +62,10 @@ animate :: [IO ()] -> IO ()
 animate as = do
 #ifdef __GHCJS__
     barrier <- newEmptyMVar
-    callback <- syncCallback1 ContinueAsync $ \_ -> do
+    requestAnimationFrame $ \_ -> do
       run as
       putMVar barrier ()
-    requestAnimationFrame callback
     takeMVar barrier
-    releaseCallback callback
 #else
     run as
 #endif
