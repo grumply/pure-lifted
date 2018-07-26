@@ -34,6 +34,9 @@ import qualified GHCJS.Concurrent as GHCJS
 import GHCJS.Types (JSVal(..))
 
 type JSV = JSVal
+
+instance Default JSVal where
+  def = nullJSV
 #else
 type JSV = ()
 #endif
@@ -176,6 +179,9 @@ foreign import javascript unsafe
   "$r = $1 === null" is_null_js :: JSV -> Bool
 
 foreign import javascript unsafe
+  "$r = null" null_jsv_js :: JSV
+
+foreign import javascript unsafe
   "$r = document.getElementsByTagName($1)[0]" get_first_element_by_tag_name_js :: Txt -> IO Element
 
 foreign import javascript unsafe
@@ -270,8 +276,8 @@ prevProp :: Evt -> IO ()
 prevProp ev = prev_prop_js (evtObj ev)
 
 {-# INLINE onRaw #-}
-onRaw :: Node -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
-onRaw n nm os f = do
+onRaw :: Coercible a JSV => a -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
+onRaw (toJSV -> n) nm os f = do
   stopper <- newIORef undefined
   cb <- syncCallback1 ContinueAsync $ \ev -> do
     when (preventDef os) (preventDefault ev)
@@ -294,6 +300,10 @@ onRaw n nm os f = do
 (..#) jsv t = do
   v <- get_prop_unsafe_js jsv t
   if isNull v || isUndefined v then return Nothing else fromJSVal v
+
+{-# INLINE nullJSV #-}
+nullJSV :: JSV
+nullJSV = null_jsv_js
 
 {-# INLINE create #-}
 create :: Txt -> IO Element
@@ -528,7 +538,7 @@ prevDef _ = return ()
 prevProp :: Evt -> IO ()
 prevProp _ = return ()
 
-onRaw :: Node -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
+onRaw :: Coercible a JSV => a -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
 onRaw n nm os f = return (return ())
 
 (.#) :: JSV -> Txt -> Maybe a
@@ -536,6 +546,9 @@ onRaw n nm os f = return (return ())
 
 (..#) :: JSV -> Txt -> IO (Maybe a)
 (..#) _ _ = return Nothing
+
+nullJSV :: JSV
+nullJSV = ()
 
 create :: Txt -> IO Element
 create _ = return (Element ())
