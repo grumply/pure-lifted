@@ -27,22 +27,32 @@ import Pure.Data.Lifted (requestIdleCallback)
 -- but we check if a reschedule is necessary between each action and act
 -- accordingly, cleaning up callbacks as we go.
 --
+-- 
+-- WARNING: Don't rely on idleWorker with GHC. Until (if) prioritized 
+--          threads land in GHC, idleWorker will not work correctly. 
+--
 -- GHC: We try to exploit the round-robin nature of thread scheduling
 -- to detect and exploit idle time. On entry we take the current time
 -- and immediately yield. On re-entry, we take the time and compare it
 -- with the initial entry time. If the entry and re-entry time differ
--- by less than 1 millisecond, we perform one action and then start over.
--- If it is more than one millisecond, we start over. If 1000 iterations
--- pass without there being a detectable idle time, we assume load is high
--- and simply pile on to try to avoid being the source of a memory leak.
--- In the worst case, this should be /approximately/ the same as not calling
--- addIdleWork. In the best case, it will exploit idle time and improve
+-- by less than 2.5 microseconds, we perform one action and then start 
+-- over with the next work item in the queue. If it is more than 2.5 
+-- microseconds, we start over. If 100 iterations pass without a 
+-- detectable idle time, we assume load is high and simply pile on to 
+-- try to avoid being the source of a memory leak. In the worst case, 
+-- this should be /approximately/ the same as not calling addIdleWork
+-- since there is a yield between evaluations of work items from the 
+-- queue. In the best case, it will exploit idle time and improve 
 -- server response times.
 --
 -- Best practices:
---   1. Keep cross-thread resource sharing to a minimum
---   2. Avoid thread synchronization with the idle worker via MVar barriers
---   3. Avoid using addIdleWork for loads with ACID-like expectations
+--   1. Keep in mind that the idle worker can keep gc objects alive longer
+--   2. Avoid thread synchronization with the idle worker via MVar barriers except for (4)
+--   3. Avoid using idle worker for loads with ACID-like expectations
+--   4. When relying on the idle worker, use a synchronizing MVar during shutdown
+--      to guarantee that work finished; the idle work queue is FIFO.
+--   5. Don't add any shutdown methods as idle work except for (4) when the consumer 
+--      is blocking the main thread
 --
 addIdleWork :: IO () -> IO Bool
 addIdleWork a = idleWorker `seq` do
@@ -112,22 +122,27 @@ workIdly = go 0
   where
     go !_ [] = return ()
     go n as0@(a:as)
-      -- avoid hogging CPU by yielding as often as possible
-      | n == 1000 = foldr (>>) (return ()) $ intersperse yield as0
+      -- avoid hogging CPU by yielding as often as possible; at a minimum, this should run every 0.01 seconds
+      | n == 100  = foldr (>>) (return ()) (intersperse yield as0)
       | otherwise = do
         !start <- getCPUTime
         yield
         !rentry <- getCPUTime
-        if rentry - start < 1000000000 -- 1 ms
+        let delta = rentry - start
+            cutoff = 2500000 -- 2.5 microsconds
+        if delta < cutoff 
           then do
-            !_ <- a
+            a
             go 0 as
-          else go (n + 1) as0
+          else do
+            let picoToMicro = flip div 1000000
+            threadDelay (fromIntegral $ picoToMicro delta * 10)
+            go (n + 1) as0
 #endif
 
 
 
 #ifdef __GHCJS__
 foreign import javascript unsafe
-  "var tr = $1.timeRemaining(); $r = tr > 0;" hasTimeRemaining :: JSV -> IO Bool
+  "var tr = $1.timeRemaining(); $r = tr > 0;" hasTimeRemaining :: JSV -> IO Boo
 #endif
