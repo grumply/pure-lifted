@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, BangPatterns #-}
 module Pure.IdleWork (addIdleWork,addIdleWorks,addIdleWorksReverse) where
 
-import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar,yield)
+import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar,yield,threadDelay)
 import Control.Monad (forever,join,void)
 import Data.Function (fix)
 import Data.IORef (IORef,newIORef,readIORef,writeIORef,atomicModifyIORef')
@@ -144,5 +144,5 @@ workIdly = go 0
 
 #ifdef __GHCJS__
 foreign import javascript unsafe
-  "var tr = $1.timeRemaining(); $r = tr > 0;" hasTimeRemaining :: JSV -> IO Boo
+  "var tr = $1.timeRemaining(); $r = tr > 0;" hasTimeRemaining :: JSV -> IO Bool
 #endif
