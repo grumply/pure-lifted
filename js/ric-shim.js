@@ -17,6 +17,9 @@
 /*
  * @see https://developers.google.com/web/updates/2015/08/using-requestidlecallback
  */
+
+var window = window || {};
+
 window.requestIdleCallback = window.requestIdleCallback ||
   function (cb) {
     return setTimeout(function () {
