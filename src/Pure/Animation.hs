@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-full-laziness -fno-state-hack #-}
-module Animation (addAnimation,addAnimations,addAnimationsReverse) where
+module Pure.Animation (addAnimation,addAnimations,addAnimationsReverse) where
 
 import Control.Exception (SomeException,catch)
 import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar)

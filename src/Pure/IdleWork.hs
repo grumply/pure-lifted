@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, BangPatterns, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-full-laziness -fno-state-hack #-}
-module IdleWork (addIdleWork, addIdleWorks, addIdleWorksReverse) where
+module Pure.IdleWork (addIdleWork, addIdleWorks, addIdleWorksReverse) where
 
 import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar,yield,threadDelay)
 import Control.Monad (forever,join,void)
