@@ -21,7 +21,7 @@ import Pure.Data.Txt (Txt)
 
 -- from ghcjs-base
 #ifdef __GHCJS__
-import GHCJS.Foreign.Callback as Export (Callback,syncCallback1,OnBlocked(..),releaseCallback)
+import GHCJS.Foreign.Callback as Export 
 import GHCJS.Marshal.Pure (PFromJSVal(..))
 import GHCJS.Marshal (FromJSVal(..))
 import GHCJS.Types hiding (isNull)
