@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, OverloadedStrings, ForeignFunctionInterface, JavaScriptFFI, BangPatterns, ViewPatterns, FlexibleContexts, DefaultSignatures #-}
+{-# LANGUAGE CPP, OverloadedStrings, ForeignFunctionInterface, JavaScriptFFI, BangPatterns, ViewPatterns, FlexibleContexts, DefaultSignatures, RecordWildCards #-}
 module Pure.Data.Lifted
     ( module Pure.Data.Lifted
 #ifdef __GHCJS__
@@ -6,20 +6,16 @@ module Pure.Data.Lifted
 #endif
     ) where
 
--- from base
 import Control.Monad (when,join)
 import Data.Coerce (Coercible(),coerce)
 import Data.Int
 import Data.IORef (newIORef,readIORef,writeIORef)
+import Data.Maybe
 import Prelude hiding (head)
 
--- from pure-default
 import Pure.Data.Default (Default(..))
-
--- from pure-txt
 import Pure.Data.Txt (Txt)
 
--- from ghcjs-base
 #ifdef __GHCJS__
 import GHCJS.Foreign.Callback as Export 
 import GHCJS.Marshal.Pure (PFromJSVal(..))
@@ -27,14 +23,11 @@ import GHCJS.Marshal (FromJSVal(..))
 import GHCJS.Types hiding (isNull)
 import qualified JavaScript.Web.AnimationFrame as GHCJS
 import qualified GHCJS.Concurrent as GHCJS
+import GHCJS.Types (JSVal(..))
 #endif
 
--- from ghcjs-base
 #ifdef __GHCJS__
-import GHCJS.Types (JSVal(..))
-
 type JSV = JSVal
-
 instance Default JSVal where
   def = nullJSV
 #else
@@ -93,6 +86,17 @@ data Options = Options
   } deriving (Eq,Show)
 instance Default Options where
   def = Options False False True
+
+data BoundingRect = BR
+    { brLeft :: Double
+    , brTop :: Double
+    , brRight :: Double
+    , brBottom :: Double
+    , brWidth :: Double
+    , brHeight :: Double
+    } deriving (Eq)
+
+instance Default BoundingRect where def = BR 0 0 0 0 0 0
 
 #ifdef __GHCJS__
 foreign import javascript unsafe
@@ -266,6 +270,27 @@ foreign import javascript unsafe
 
 foreign import javascript unsafe
   "$1.stopPropagation" prev_prop_js :: JSV -> IO ()
+
+foreign import javascript unsafe 
+  "$r = $1.getBoundingClientRect()" bounding_client_rect_js :: Node -> IO JSV
+
+foreign import javascript unsafe 
+  "$r = window.innerHeight" inner_height_js :: IO Int
+
+foreign import javascript unsafe
+  "$r = window.innerWidth" inner_width_js :: IO Int
+
+foreign import javascript unsafe
+  "$r = window.pageYOffset" page_y_offset_js :: IO Int
+
+foreign import javascript unsafe
+  "$r = window.pageXOffset" page_x_offset_js :: IO Int
+
+foreign import javascript unsafe
+  "$r = document.documentElement.clientWidth" client_width_js :: IO Int
+
+foreign import javascript unsafe
+  "$r = document.documentElement.clientHeight" client_height_js :: IO Int
 
 {-# INLINE prevDef #-}
 prevDef :: Evt -> IO ()
@@ -520,6 +545,43 @@ getPathname = pathname_js
 {-# INLINE getSearch #-}
 getSearch :: IO Txt
 getSearch = search_js
+
+{-# INLINE innerHeight #-}
+innerHeight :: IO Int
+innerHeight = inner_height_js
+
+{-# INLINE innerWidth #-}
+innerWidth :: IO Int
+innerWidth = inner_width_js
+
+{-# INLINE getBoundingRect #-}
+getBoundingRect :: Node -> IO BoundingRect
+getBoundingRect node = do
+  o <- bounding_client_rect_js node
+  return $ fromMaybe (error "Pure.Data.Lifted.getBoundingRect: fromMaybe got Nothing") $ do
+    brLeft   <- o .# "left"
+    brTop    <- o .# "top"
+    brRight  <- o .# "right"
+    brBottom <- o .# "bottom"
+    brWidth  <- o .# "width"
+    brHeight <- o .# "height"
+    return BR {..}
+
+{-# INLINE pageYOffset #-}
+pageYOffset :: IO Int
+pageYOffset = page_y_offset_js
+
+{-# INLINE pageXOffset #-}
+pageXOffset :: IO Int
+pageXOffset = page_x_offset_js
+
+{-# INLINE clientWidth #-}
+clientWidth :: IO Int
+clientWidth = client_width_js
+
+{-# INLINE clientHeight #-}
+clientHeight :: IO Int
+clientHeight = client_height_js
 #else
 
 ----------------------------------------
@@ -711,5 +773,26 @@ getPathname = return ""
 
 getSearch :: IO Txt
 getSearch = return ""
+
+innerHeight :: IO Int
+innerHeight = return 0
+
+innerWidth :: IO Int
+innerWidth = return 0
+
+getBoundingRect :: Node -> IO BoundingRect
+getBoundingRect node = return $ BR 0 0 0 0 0 0
+
+pageYOffset :: IO Int
+pageYOffset = return 0
+
+pageXOffset :: IO Int
+pageXOffset = return 0
+
+clientWidth :: IO Int
+clientWidth = return 0
+
+clientHeight :: IO Int
+clientHeight = return 0
 #endif
 
