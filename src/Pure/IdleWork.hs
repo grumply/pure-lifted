@@ -96,7 +96,7 @@ workIdly as = do
             go (a:as) = do
               a `catch` \(_ :: SomeException) -> return () -- ignore failed idle workers
               tr <- hasTimeRemaining deadline
-              let k = if tr then go else return . Just
+              let k | tr = go | [] <- as = return . const Nothing | otherwise = return . Just
               k as
 #endif
 
