@@ -80,12 +80,13 @@ data Evt = Evt
   }
 
 data Options = Options
-  { preventDef :: Bool
-  , stopProp   :: Bool
-  , passive    :: Bool
+  { preventDef  :: Bool
+  , stopProp    :: Bool
+  , passive     :: Bool
+  , synchronous :: Bool 
   } deriving (Eq,Show)
 instance Default Options where
-  def = Options False False True
+  def = Options False False True False
 
 data BoundingRect = BR
     { brLeft :: Double
