@@ -3,7 +3,7 @@
 module Pure.Animation (addAnimation,addAnimations,addAnimationsReverse) where
 
 import Control.Exception (SomeException,catch)
-import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar)
+import Control.Concurrent (MVar,newEmptyMVar,forkIO,takeMVar,putMVar,tryPutMVar,yield)
 import Control.Monad (void,forever)
 import Data.Function (fix)
 import Data.IORef (IORef,newIORef,atomicModifyIORef')
@@ -58,6 +58,7 @@ animator = unsafePerformIO $ void $ forkIO (fix (work >>))
       where
         await :: IO ()
         await = do
+          yield
           takeMVar animationsAwaiting
           as <- atomicModifyIORef' animationQueue $ \as -> ([],as)
           animate (reverse as)

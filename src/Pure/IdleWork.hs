@@ -67,6 +67,7 @@ idleWorker = unsafePerformIO $ void $ forkIO (fix (work >>))
       where
         await :: IO ()
         await = do
+          yield
           takeMVar idleWorkAwaiting
           as <- atomicModifyIORef' idleWorkQueue $ \as -> ([],as)
           workIdly (reverse as)
