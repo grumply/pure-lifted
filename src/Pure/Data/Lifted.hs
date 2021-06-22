@@ -216,6 +216,15 @@ foreign import javascript unsafe
   "$1.stopPropagation()" stop_propagation_js :: JSV -> IO ()
 
 foreign import javascript unsafe
+  "console.timeStamp($1)" timestamp_js :: Txt -> IO ()
+
+foreign import javascript unsafe
+  "console.time($1)" time_start_js :: Txt -> IO ()
+
+foreign import javascript unsafe
+  "console.timeEnd($1)" time_end_js :: Txt -> IO ()
+
+foreign import javascript unsafe
   "$1.addEventListener($2,$3,{passive:$4})" add_event_listener_js :: JSV -> Txt -> Callback (JSV -> IO ()) -> Bool -> IO ()
 
 foreign import javascript unsafe
@@ -266,12 +275,6 @@ foreign import javascript unsafe
 foreign import javascript unsafe
   "$r = $1[$2]" get_prop_unsafe_js_pure :: JSV -> Txt -> JSV
 
-foreign import javascript unsafe
-  "$1.preventDefault" prev_def_js :: JSV -> IO ()
-
-foreign import javascript unsafe
-  "$1.stopPropagation" prev_prop_js :: JSV -> IO ()
-
 foreign import javascript unsafe 
   "$r = $1.getBoundingClientRect()" bounding_client_rect_js :: Node -> IO JSV
 
@@ -295,11 +298,29 @@ foreign import javascript unsafe
 
 {-# INLINE prevDef #-}
 prevDef :: Evt -> IO ()
-prevDef ev = prev_def_js (evtObj ev)
+prevDef ev = preventDefault (evtObj ev)
 
 {-# INLINE prevProp #-}
 prevProp :: Evt -> IO ()
-prevProp ev = prev_prop_js (evtObj ev)
+prevProp ev = stopPropagation (evtObj ev)
+
+{-# INLINE extinguish #-}
+extinguish :: Evt -> IO ()
+extinguish ev = do
+  prevDef ev
+  prevProp ev
+
+{-# INLINE timestamp #-}
+timestamp :: Txt -> IO ()
+timestamp label = timestamp_js label
+
+{-# INLINE timed #-}
+timed :: Txt -> IO a -> IO a
+timed label act = do
+  time_start_js label 
+  a <- act
+  time_end_js label
+  return a
 
 {-# INLINE onRaw #-}
 onRaw :: Coercible a JSV => a -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
@@ -600,6 +621,15 @@ prevDef _ = return ()
 
 prevProp :: Evt -> IO ()
 prevProp _ = return ()
+
+extinguish :: Evt -> IO ()
+extinguish _ = return ()
+
+timestamp :: Txt -> IO ()
+timestamp _ = return ()
+
+timed :: Txt -> IO a -> IO a
+timed _ act = act 
 
 onRaw :: Coercible a JSV => a -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
 onRaw n nm os f = return (return ())
