@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, OverloadedStrings, ForeignFunctionInterface, JavaScriptFFI, BangPatterns, ViewPatterns, FlexibleContexts, DefaultSignatures, RecordWildCards #-}
+{-# LANGUAGE CPP, OverloadedStrings, ForeignFunctionInterface, JavaScriptFFI, BangPatterns, ViewPatterns, FlexibleContexts, DefaultSignatures, RecordWildCards, ScopedTypeVariables #-}
 module Pure.Data.Lifted
     ( module Pure.Data.Lifted
 #ifdef __GHCJS__
@@ -7,14 +7,19 @@ module Pure.Data.Lifted
     ) where
 
 import Control.Monad (when,join)
+import Control.Monad.IO.Class (MonadIO(..))
 import Data.Coerce (Coercible(),coerce)
 import Data.Int
+import Data.List as List (intercalate,reverse)
+import Data.Maybe (fromMaybe)
 import Data.IORef (newIORef,readIORef,writeIORef)
-import Data.Maybe
+import GHC.Clock (getMonotonicTimeNSec)
+import GHC.Stack (HasCallStack,getCallStack,callStack,srcLocModule)
+import Text.Printf (printf)
 import Prelude hiding (head)
 
 import Pure.Data.Default (Default(..))
-import Pure.Data.Txt (Txt)
+import Pure.Data.Txt (Txt,toTxt)
 
 #ifdef __GHCJS__
 import GHCJS.Foreign.Callback as Export 
@@ -315,12 +320,22 @@ timestamp :: Txt -> IO ()
 timestamp label = timestamp_js label
 
 {-# INLINE timed #-}
-timed :: Txt -> IO a -> IO a
-timed label act = do
-  time_start_js label 
-  a <- act
-  time_end_js label
-  return a
+timed :: forall m a. (MonadIO m, HasCallStack) => m a -> m a
+timed = go (toTxt scope)
+  where
+    go :: Txt -> m a -> m a
+    go label act = do
+      liftIO (time_start_js label)
+      a <- act
+      liftIO (time_end_js label)
+      return a 
+      
+    scope :: HasCallStack => String
+    scope =
+      case getCallStack callStack of
+        _:_:s@((_,sl):_) -> List.intercalate "." (srcLocModule sl : fmap fst (List.reverse s))
+        [(l,sl)]         -> srcLocModule sl <> "." <> l
+        _                -> "<unknown>"
 
 {-# INLINE onRaw #-}
 onRaw :: Coercible a JSV => a -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
@@ -628,8 +643,25 @@ extinguish _ = return ()
 timestamp :: Txt -> IO ()
 timestamp _ = return ()
 
-timed :: Txt -> IO a -> IO a
-timed _ act = act 
+{-# INLINE timed #-}
+timed :: forall m a. (MonadIO m, HasCallStack) => m a -> m a
+timed = go scope
+  where
+    go :: String -> m a -> m a
+    go label act = do
+      start <- liftIO getMonotonicTimeNSec
+      result <- act
+      end <- liftIO getMonotonicTimeNSec
+      let ms = fromIntegral (end - start) / (1000000 :: Double)
+      liftIO $ print (label <> ": " <> printf "%.3f" ms <> "ms") 
+      return result
+      
+    scope :: HasCallStack => String
+    scope = 
+      case getCallStack callStack of
+        _:_:s@((_,sl):_) -> List.intercalate "." (srcLocModule sl : fmap fst (List.reverse s))
+        [(l,sl)]         -> srcLocModule sl <> "." <> l
+        _                -> "<unknown>"
 
 onRaw :: Coercible a JSV => a -> Txt -> Options -> (IO () -> JSV -> IO ()) -> IO (IO ())
 onRaw n nm os f = return (return ())
@@ -826,4 +858,3 @@ clientWidth = return 0
 clientHeight :: IO Int
 clientHeight = return 0
 #endif
-
